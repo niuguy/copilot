@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { UsageItem, ChartData, SortState } from '@/types';
-import { fetchUsageData } from '@/services/api';
+import { apiService } from '@/services/api';
 import { UsageChart } from './usage-chart';
 import { UsageTable } from './usage-table';
 
@@ -23,7 +23,7 @@ export function UsageDashboard() {
 
   const loadData = async () => {
     try {
-      const response = await fetchUsageData();
+      const response = await apiService.getUsageData();
       setData(response.usage);
       
       // Process chart data
@@ -37,6 +37,8 @@ export function UsageDashboard() {
         date,
         credits: Number(credits.toFixed(2))
       })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      console.log(chartData);
       
       setChartData(chartData);
       setIsLoading(false);
@@ -86,18 +88,25 @@ export function UsageDashboard() {
     return sortedData;
   };
 
-  if (isLoading) return <div className="p-4">Loading...</div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  if (isLoading) return <div className="p-4 text-center">Loading...</div>;
+  if (error) return <div className="p-4 text-red-500 text-center">{error}</div>;
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Usage Dashboard</h1>
-      <UsageChart data={chartData} />
-      <UsageTable 
-        data={getSortedData()} 
-        sortState={sortState}
-        onSort={handleSort}
-      />
+    <div className="p-4 w-full">
+      <h1 className="text-2xl font-bold mb-6 text-center">Usage Dashboard</h1>
+      <div className="flex flex-col items-center">
+        <div className="w-full mb-8">
+          <UsageChart data={chartData} />
+        </div>
+        <div className="w-full">
+          <UsageTable 
+            data={getSortedData()} 
+            reportSort={sortState.reportSort}
+            creditSort={sortState.creditSort}
+            onSort={handleSort}
+          />
+        </div>
+      </div>
     </div>
   );
 }

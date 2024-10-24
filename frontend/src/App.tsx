@@ -4,7 +4,9 @@ import { UsageDashboard } from './components/dashboard/usage-dashboard';
 function App() {
   return (
     <Router>
-      <UsageDashboard />
+      <div style={{ width: '100%', height: '100vh' }}>
+        <UsageDashboard />
+      </div>
     </Router>
   );
 }
