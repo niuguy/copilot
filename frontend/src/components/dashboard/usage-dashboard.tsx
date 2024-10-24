@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { UsageItem, ChartData, SortState } from '@/types';
+import { UsageItem, ChartDataItem, SortState } from '@/types';
 import { apiService } from '@/services/api';
 import { UsageChart } from './usage-chart';
 import { UsageTable } from './usage-table';
 
 export function UsageDashboard() {
   const [data, setData] = useState<UsageItem[]>([]);
-  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,22 +25,8 @@ export function UsageDashboard() {
     try {
       const response = await apiService.getUsageData();
       setData(response.usage);
-      
-      // Process chart data
-      const dateGroups = response.usage.reduce<Record<string, number>>((acc, item) => {
-        const date = new Date(item.timestamp).toLocaleDateString('en-GB');
-        acc[date] = (acc[date] || 0) + item.credits;
-        return acc;
-      }, {});
-      
-      const chartData = Object.entries(dateGroups).map(([date, credits]) => ({
-        date,
-        credits: Number(credits.toFixed(2))
-      })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      console.log(chartData);
-      
-      setChartData(chartData);
+      setChartData(response.chart_data);
+      console.log(response.chart_data);
       setIsLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');

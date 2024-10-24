@@ -3,22 +3,28 @@ export interface UsageItem {
     timestamp: string;
     report_name?: string;
     credits: number;
-  }
-  
-  export interface UsageResponse {
+}
+
+export interface UsageResponse {
     usage: UsageItem[];
     total_credits: number;
-  }
-  
-  // src/types/dashboard.ts
-  export type SortDirection = 'none' | 'asc' | 'desc';
-  
-  export interface SortState {
+    chart_data: ChartDataItem[];
+}
+
+// src/types/dashboard.ts
+export type SortDirection = 'none' | 'asc' | 'desc';
+
+export interface SortState {
     reportSort: SortDirection;
     creditSort: SortDirection;
-  }
-  
-  export interface ChartData {
+}
+
+export interface ChartData {
     date: string;
     credits: number;
-  }
+}
+
+export interface ChartDataItem {
+    date: string;
+    credits: number;
+}
