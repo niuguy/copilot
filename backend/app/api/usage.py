@@ -22,10 +22,46 @@ class APIError(Exception):
     """Custom exception for API-related errors"""
     pass
 
+def is_palindrome(text: str) -> bool:
+    cleaned = ''.join(char.lower() for char in text if char.isalnum())
+    return cleaned == cleaned[::-1]
+
 def calculate_message_credits(text: str) -> float:
-    words = re.findall(r'\w+', text)
-    word_count = len(words)
-    return round(word_count * 0.1, 2)
+    # Base cost
+    credits = 1.0
+    
+    # Character count
+    credits += len(text) * 0.05
+    
+    # Word length multipliers and unique word check
+    words = re.findall(r'\b[\w\'-]+\b', text)
+    unique_words = set(words)
+    
+    for word in words:
+        if len(word) <= 3:
+            credits += 0.1
+        elif len(word) <= 7:
+            credits += 0.2
+        else:
+            credits += 0.3
+    
+    # Third vowels
+    vowels = 'aeiouAEIOU'
+    credits += sum(0.3 for i, char in enumerate(text) if (i + 1) % 3 == 0 and char in vowels)
+    
+    # Length penalty
+    if len(text) > 100:
+        credits += 5
+    
+    # Unique word bonus
+    if len(words) == len(unique_words):
+        credits = max(1, credits - 2)
+    
+    # Palindrome check
+    if is_palindrome(text):
+        credits *= 2
+    
+    return round(credits, 2)
 
 def get_report_details(report_id: int) -> Optional[Report]:
     try:
@@ -39,6 +75,9 @@ def get_report_details(report_id: int) -> Optional[Report]:
             credit_cost=report_data['credit_cost']
         )
     except requests.RequestException as e:
+        if e.response and e.response.status_code == 404:
+            logger.warning(f"Report not found for ID {report_id}, falling back to message text calculation")
+            return None
         logger.error(f"Failed to fetch report details: {str(e)}")
         raise APIError(f"Failed to fetch report details: {str(e)}")
 
@@ -102,14 +141,11 @@ async def get_usage():
             report_name = None
 
             if message.report_id:
-                try:
-                    report = get_report_details(message.report_id)
-                    if report:
-                        credits = report.credit_cost
-                        report_name = report.name
-                    else:
-                        credits = calculate_message_credits(message.text)
-                except APIError:
+                report = get_report_details(message.report_id)
+                if report:
+                    credits = report.credit_cost
+                    report_name = report.name
+                else:
                     credits = calculate_message_credits(message.text)
             else:
                 credits = calculate_message_credits(message.text)
