@@ -4,7 +4,7 @@ import { UsageDashboard } from './components/dashboard/usage-dashboard';
 function App() {
   return (
     <Router>
-      <div style={{ width: '100%', height: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
         <UsageDashboard />
       </div>
     </Router>
