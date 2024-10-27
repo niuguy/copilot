@@ -101,20 +101,26 @@ export const UsageTable: React.FC<UsageTableProps> = ({ data }) => {
     maxMultiSortColCount: 2,
     enableSortingRemoval: true, // Enable the ability to remove sorting
     isMultiSortEvent: (e) => true,
+    
   })
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div className="relative w-full">
+      <div className="w-full max-w-4xl">
+      <table className="table-auto border-collapse w-full border-2 border-gray-500">
         <thead className="bg-gray-50">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="border-2 border-gray-500 px-3 py-3 text-left font-semibold"
                   onClick={header.column.getToggleSortingHandler()}
-                  style={{ cursor: header.column.getCanSort() ? 'pointer' : 'default' }}
+                  style={{ 
+                    cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                    minWidth: '150px',
+                    maxWidth: '250px'
+                  }}
                   title={
                     header.column.getCanSort()
                       ? header.column.getNextSortingOrder() === 'asc'
@@ -140,18 +146,22 @@ export const UsageTable: React.FC<UsageTableProps> = ({ data }) => {
             </tr>
           ))}
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody>
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id}>
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                <td 
+                  key={cell.id} 
+                  className="border-2 border-gray-500 px-3 py-2 whitespace-nowrap overflow-hidden text-ellipsis"
+                >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   )
 }
