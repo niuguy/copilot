@@ -7,7 +7,7 @@
 
 ### Installation and Running the Application
 
-#### Using Docker Compose (Recommended)
+#### Using Docker Compose
 
 Build and start the containers:
    ```
