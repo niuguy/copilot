@@ -14,4 +14,3 @@ class Report(BaseModel):
     id: int
     name: str
     credit_cost: float
-

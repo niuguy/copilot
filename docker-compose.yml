@@ -24,7 +24,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: builder # Use the builder stage for development
+      target: dev  # Use the dev stage for development
     ports:
       - "3000:3000"
     environment:
@@ -33,23 +33,22 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: npm run dev -- --host
     depends_on:
       - backend
     networks:
       - usage-dashboard
 
-  test:
-    build:
-      context: ./backend  # Adjust this path to where your Dockerfile is located
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app  # Mount your backend code into the container
-    command: pytest
-    environment:
-      - PYTHONPATH=/app
-    depends_on:
-      - backend
+  # test:
+  #   build:
+  #     context: ./backend  # Adjust this path to where your Dockerfile is located
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./backend:/app  # Mount your backend code into the container
+  #   command: pytest
+  #   environment:
+  #     - PYTHONPATH=/app
+  #   depends_on:
+  #     - backend
 
 networks:
   usage-dashboard:

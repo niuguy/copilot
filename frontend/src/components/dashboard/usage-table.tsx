@@ -1,3 +1,4 @@
+import React from 'react';
 import { UsageItem } from '@/types';
 import { formatTimestamp } from '@/utils/date';
 import {
@@ -100,7 +101,7 @@ export const UsageTable: React.FC<UsageTableProps> = ({ data }) => {
     enableMultiSort: true,
     maxMultiSortColCount: 2,
     enableSortingRemoval: true, // Enable the ability to remove sorting
-    isMultiSortEvent: (e) => true,
+    isMultiSortEvent: () => true,
     
   })
 

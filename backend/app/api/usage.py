@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from ..schemas import UsageChartResponse, ChartDataItem, UsageItem
 from ..models import Message, Report
-import requests
 from datetime import datetime
 import re
 from typing import List, Optional
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+import aiohttp
+import asyncio
 
 router = APIRouter()
 
@@ -71,60 +74,82 @@ def calculate_message_credits(text: str) -> float:
     return round(credits, 2)
 
 
-def get_report_details(report_id: int) -> Optional[Report]:
-    try:
-        response = requests.get(f"{REPORTS_ENDPOINT}/{report_id}")
-        response.raise_for_status()
-        report_data = response.json()
-        logger.info(f"Report data: {report_data}")
-        return Report(
-            id=report_data["id"],
-            name=report_data["name"],
-            credit_cost=report_data["credit_cost"],
-        )
-    except requests.RequestException as e:
-        if e.response and e.response.status_code == 404:
-            logger.warning(
-                f"Report not found for ID {report_id}, falling back to message text calculation"
-            )
+async def get_report_details_async(report_id: int) -> Optional[Report]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(f"{REPORTS_ENDPOINT}/{report_id}") as response:
+                if response.status == 404:
+                    logger.warning(
+                        f"Report not found for ID {report_id}, falling back to message text calculation"
+                    )
+                    return None
+                report_data = await response.json()
+                return Report(
+                    id=report_data["id"],
+                    name=report_data["name"],
+                    credit_cost=report_data["credit_cost"],
+                )
+        except aiohttp.ClientError as e:
+            logger.error(f"Failed to fetch report details: {str(e)}")
             return None
-        logger.error(f"Failed to fetch report details: {str(e)}")
-        return None  # Return None for any other error as well
 
 
-def get_current_period_messages() -> List[Message]:
-    try:
-        response = requests.get(MESSAGES_ENDPOINT)
-        response.raise_for_status()
-        data = response.json()
-        logger.info(f"API response data type: {type(data)}")
-        logger.info(f"API response data: {data}")
+async def get_current_period_messages_async() -> List[Message]:
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(MESSAGES_ENDPOINT) as response:
+                response.raise_for_status()
+                data = await response.json()
+                logger.info(f"API response data type: {type(data)}")
+                logger.info(f"API response data: {data}")
 
-        if not isinstance(data, dict) or "messages" not in data:
-            logger.error(f"Unexpected data format: {data}")
-            raise APIError("Unexpected data format received from API")
+                if not isinstance(data, dict) or "messages" not in data:
+                    logger.error(f"Unexpected data format: {data}")
+                    raise APIError("Unexpected data format received from API")
 
-        messages_data = data["messages"]
+                messages_data = data["messages"]
 
-        if not isinstance(messages_data, list):
-            logger.error(f"Messages data is not a list: {messages_data}")
-            raise APIError("Messages data is not in the expected format")
+                if not isinstance(messages_data, list):
+                    logger.error(f"Messages data is not a list: {messages_data}")
+                    raise APIError("Messages data is not in the expected format")
 
-        return [
-            Message(
-                id=msg["id"],
-                text=msg["text"],
-                timestamp=datetime.fromisoformat(msg["timestamp"]),
-                report_id=msg.get("report_id"),
-            )
-            for msg in messages_data
-        ]
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch current period messages: {str(e)}")
-        raise APIError(f"Failed to fetch current period messages: {str(e)}")
-    except KeyError as e:
-        logger.error(f"Missing key in message data: {str(e)}")
-        raise APIError(f"Invalid data format: missing key {str(e)}")
+                return [
+                    Message(
+                        id=msg["id"],
+                        text=msg["text"],
+                        timestamp=datetime.fromisoformat(msg["timestamp"]),
+                        report_id=msg.get("report_id"),
+                    )
+                    for msg in messages_data
+                ]
+        except aiohttp.ClientError as e:
+            logger.error(f"Failed to fetch current period messages: {str(e)}")
+            raise APIError(f"Failed to fetch current period messages: {str(e)}")
+        except KeyError as e:
+            logger.error(f"Missing key in message data: {str(e)}")
+            raise APIError(f"Invalid data format: missing key {str(e)}")
+
+
+async def process_message_async(message):
+    credits = 0.0
+    report_name = None
+
+    if message.report_id:
+        report = await get_report_details_async(message.report_id)
+        if report:
+            credits = report.credit_cost
+            report_name = report.name
+        else:
+            credits = calculate_message_credits(message.text)
+    else:
+        credits = calculate_message_credits(message.text)
+
+    return UsageItem(
+        id=message.id,
+        timestamp=message.timestamp,
+        credits=round(credits, 2),
+        report_name=report_name,
+    )
 
 
 def generate_chart_data(usage_items: List[UsageItem]) -> List[ChartDataItem]:
@@ -145,36 +170,15 @@ def generate_chart_data(usage_items: List[UsageItem]) -> List[ChartDataItem]:
 @router.get("/usage", response_model=UsageChartResponse)
 async def get_usage():
     try:
-        messages = get_current_period_messages()
-        usage_items = []
-        total_credits = 0.0
+        messages = await get_current_period_messages_async()
 
-        for message in messages:
-            credits = 0.0
-            report_name = None
+        # Process messages concurrently using asyncio.gather
+        usage_items = await asyncio.gather(
+            *[process_message_async(message) for message in messages]
+        )
 
-            if message.report_id:
-                report = get_report_details(message.report_id)
-                if report:
-                    credits = report.credit_cost
-                    report_name = report.name
-                else:
-                    credits = calculate_message_credits(message.text)
-            else:
-                credits = calculate_message_credits(message.text)
-
-            usage_item = UsageItem(
-                id=message.id,
-                timestamp=message.timestamp,
-                credits=round(credits, 2),
-                report_name=report_name,
-            )
-
-            usage_items.append(usage_item)
-            total_credits += credits
-
+        total_credits = sum(item.credits for item in usage_items)
         chart_data = generate_chart_data(usage_items)
-        print(usage_items)
 
         return UsageChartResponse(
             usage=usage_items,
@@ -183,6 +187,7 @@ async def get_usage():
         )
     except APIError as e:
         logger.error(f"API Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
